@@ -21,6 +21,8 @@
 為了讓 Windows 可以執行 WSL 與 k0s，必須符合以下條件
 
 - Windows 功能中必須啟用 `Windows 子系統 Linux 版` 與 `虛擬機器平台`
+- WSL 核心版本須高於 5.11
+  > 必須支援 systemd
 - 終端機
 
 ## 在 WSL 中安裝 RockyLinux
