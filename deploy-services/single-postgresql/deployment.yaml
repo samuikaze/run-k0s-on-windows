@@ -1,0 +1,122 @@
+# namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database-clusters
+
+---
+# statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: database-clusters
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  serviceName: postgres
+  replicas: 1
+  minReadySeconds: 10
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: postgres
+          image: postgres:18.2-bookworm
+          env:
+            - name: POSTGRES_PASSWORD_FILE
+              value: /var/secrets/postgrespasswd
+          ports:
+            - containerPort: 5432
+              name: postgres
+              protocol: TCP
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+            - name: password-file-volume
+              mountPath: /var/secrets
+              readOnly: true
+      voluems:
+        - name: password-file-volume
+          secret:
+            secretName: postgres-secret
+  volumeClaimTemplate:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOncePod
+        storageClassName: postgres-data-local-storage
+        resources:
+          requests:
+            storage: 100Gi
+
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: database-clusters
+  labels:
+    app: postgres
+spec:
+  ports:
+    - port: 5432
+      name: postgres
+  clusterIP: None
+  selector:
+    app: postgres
+
+---
+# configmap.yaml
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: postgres-configs
+#   namespace: database-clusters
+# data:
+  # 若有任何特殊設定，可以在這邊填寫
+  # 然後在透過環境變數或實體檔案掛載到容器中
+
+---
+# secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: database-clusters
+data:
+  # 這邊請取代為你自己的密碼
+  postgrespasswd: REPLACE_WITH_YOUR_PASSWORD
+
+---
+# storage-class.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: postgres-data-local-storage
+# 表示此 StorageClass 不支援動態製備
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# persistent-volume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv-1
+spec:
+  capacity:
+    storage: 100Gi
+  hostPath:
+    # 指定機器中的實體目錄位置
+    path: /path/to/directory
+  accessModes:
+    - ReadWriteOncePod
+  storageClassName: postgres-data-local-storage
+

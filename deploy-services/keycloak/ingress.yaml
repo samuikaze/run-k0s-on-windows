@@ -1,0 +1,39 @@
+# ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-ingress
+  namespace: auth-service
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "7200"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "7200"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "7200"
+    nginx.ingress.kubernetes.io/proxy-max-temp-file-size: "0"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+    ngnix.ingress.kubernetes.io/proxy-buffer-size: "64k"
+    nginx.ingress.kubernetes.io/client_body_timeout: "7200"
+    nginx.ingress.kubernetes.io/x-forwarded-host: "$host"
+    nginx.ingress.kubernetes.io/x-forwarded-proto: "$scheme"
+    nginx.ingress.kubernetes.io/x-forwarded-port: "$server_port"
+spec:
+  tls:
+    # 請改成自己的 Hostname，沒有 TLS 憑證也請透過 cert-manager 簽一張出來用
+    # 對於驗證服務對外的流量都應走 HTTPS 協定比較安全
+    - hosts:
+      - myhost.net
+      secretName: myhost-tls-secret
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /auth-service
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 80

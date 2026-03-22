@@ -1,0 +1,264 @@
+# namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: auth-service
+  labels:
+    name: auth-service
+
+---
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+  namespace: auth-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          # 26.5.5 版是在撰寫文件當下最新的穩定版，版本號碼請自行調整
+          image: quay.io/keycloak/keycloak:26.5.5
+          command:
+            # 如果是要開發測試使用，請改為 `start-dev`
+            - "start"
+          resources:
+            # 目前這邊設定的值為官方推薦的最小值
+            # 請依需求自行調整
+            requests:
+              memory: 1250Mi
+              cpu: 3
+            limits:
+              memory: 1360Mi
+              cpu: 7.5
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+            # 除非 Cluster 內部也要走 HTTPS，否則 HTTPS 建議由 ingress 處理
+            # - name: https
+            #   containerPort: 8443
+            - name: jgroups
+              containerPort: 7800
+            - name: jgroups-fd
+              containerPort: 57800
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 1
+            failureThreshold: 600
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: bootstrap.admin.username
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: bootstrap.admin.password
+            - name: KC_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: db.vendor
+            - name: KC_DB_URL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: db.host
+            - name: KC_DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: db.port
+            - name: KC_DB_URL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: db.name
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: db.username
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: db.password
+            - name: KC_METRICS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: metrics.enabled
+            - name: KC_HEALTH_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: metrics.enabled
+            - name: KC_FEATURES
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: features
+            - name: KC_HTTP_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: http.enabled
+            - name: KC_HOSTNAME_STRICT
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: hostname.strict
+            - name: KC_HTTP_RELATIVE_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: http.relative.path
+            - name: KC_SPI_TRUSTSTORE_FILE
+              value: /opt/keycloak/ca/ca-bundle.crt
+            - name: KC_SPI_TRUSTSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: spi.truststore.password
+            - name: KC_SPI_TRUSTSTORE_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: spi.truststore.type
+            - name: KC_PROXY_HEADERS
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: proxy.headers
+            - name: KC_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-config
+                  key: proxy.proxy
+            - name: KC_LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: keycloak-configs
+                  key: log.level
+            # Passing the Pod's IP primary address to the JGroups clustering as this is required in IPv6 only setups
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: KC_CACHE_EMBEDDED_NETWORK_BIND_ADDRESS
+              value: "$(POP_IP)"
+
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: auth-service
+spec:
+  type: ClusterIP
+  selector:
+    app: keycloak
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+      name: http
+
+---
+# discovery-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: keycloak
+  name: keycloak-discovery
+  namespace: auth-service
+spec:
+  selector:
+    app: keycloak
+  clusterIP: None
+  type: ClusterIP
+
+---
+# config-map.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-configs
+  namespace: auth-service
+data:
+  # 設定資料庫種類
+  db.vendor: "postgres"
+  # 設定資料庫連線網址
+  db.host: postgres.db-ns.svc.cluster.local
+  # 設定資料庫連線連接埠
+  db.port: "5432"
+  # 設定資料庫名稱
+  db.name: keycloak
+  # 是否啟用遙測資料
+  metrics.enabled: "false"
+  # 是否啟用健康檢查端點
+  health.enabled: "true"
+  # 設定要額外啟用的選用功能
+  features: docker
+  # 預期所有的 TLS 都會終結在 ingress
+  http.enabled: "true"
+  hostname.strict: "false"
+  # 透過 ingress 轉發流量時，如果有前綴 path 請不要 Rewrite 掉
+  # 讓這些前綴 path 一起被轉發到 Keycloak，否則會出很多問題
+  http.relative.path: /
+  # 如果有需求可以調整 Log Level
+  log.level: info
+  spi.truststore.type: "PEM"
+  proxy.headers: "xforwarded"
+  proxy.proxy: "edge"
+
+---
+# saberline-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-secrets
+  namespace: auth-service
+type: Opaque
+data:
+  # 設定初始管理員帳號
+  bootstrap.admin.username: REPLACE_WITH_YOUR_USERNAME_ENCODED_IN_B64
+  # 設定初始管理員密碼
+  bootstrap.admin.password: REPLACE_WITH_YOUR_PASSWORD_ENCODED_IN_B64
+  # 設定資料庫連線使用者帳號
+  db.username: REPLACE_WITH_YOUR_USERNAME_ENCODED_IN_B64
+  # 設定資料庫連線使用者密碼
+  db.password: REPLACE_WITH_YOUR_PASSWORD_ENCODED_IN_B64
+  spi.truststore.password: REPLACE_WITH_YOUR_PASSWORD_ENCODED_IN_B64

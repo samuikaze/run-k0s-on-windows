@@ -7,6 +7,8 @@
 
 > 請注意，WSL 其用意仍在提供開發上的方便，正式環境的投入還是建議使用更完整的 Linux 作業系統來執行會比較安全
 
+> 裝完 k0s 後可以看一下 [deploy-services](/deploy-services/README.md) 這個資料夾的內容，可能會有你需要的資訊
+
 ## Table of Contents
 
 - [必要條件](#必要條件)
@@ -231,7 +233,7 @@
 3. 退出 WSL 機器，並執行 `wsl -u root --exec bash -c "dbus-launch true; echo hello"` 指令
     > 或 `wsl -d DISTRO_NAME -u root --exec bash -c "dbus-launch true; echo hello"` 如果這個 WSL 機器不是你的預設機器
 4. 過五分鐘後執行指令 `wsl -l -v` 來確認該 WSL 機器有沒有被自動停止，若沒有就表示設定成功
-5. 為了避免未來每次重啟 Windows 機器都還要手動執行此指令，可以透過 Windows 排程管理器來自動執行此專案下提供的 keep-wsl-running.bat 檔案
+5. 為了避免未來每次重啟 Windows 機器都還要手動執行此指令，可以透過 Windows 排程管理器來自動執行此專案下提供的 `scripts/keep-wsl-running.bat` 檔案
 6. 完成
 
 ## 參考資料
