@@ -1,0 +1,13 @@
+# ip-address-pool.yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: first-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  # 請將外部 IPs 寫到以下的陣列中，如下範例撰寫即可
+  # 單一 IP 也支援
+  - 192.168.10.0/24
+  - 192.168.9.1-192.168.9.5
+  - fc00:f853:0ccd:e799::/124
