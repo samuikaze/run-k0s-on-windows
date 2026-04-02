@@ -29,7 +29,7 @@ spec:
         - name: keycloak
           # 26.5.5 版是在撰寫文件當下最新的穩定版，版本號碼請自行調整
           image: quay.io/keycloak/keycloak:26.5.5
-          command:
+          args:
             # 如果是要開發測試使用，請改為 `start-dev`
             - "start"
           resources:
@@ -122,7 +122,7 @@ spec:
               valueFrom:
                 configMapKeyRef:
                   name: keycloak-configs
-                  key: metrics.enabled
+                  key: health.enabled
             - name: KC_FEATURES
               valueFrom:
                 configMapKeyRef:
@@ -176,7 +176,7 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: KC_CACHE_EMBEDDED_NETWORK_BIND_ADDRESS
-              value: "$(POP_IP)"
+              value: "$(POD_IP)"
 
 ---
 # service.yaml
